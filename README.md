@@ -4,6 +4,10 @@
 
 原创、中文、单机经营游戏。原生 HTML/CSS/JavaScript；运行时没有外部依赖、账号系统、付费 API 或追踪服务。优先为 iPad Safari 触控设计。
 
+**立即游玩：[零点交易所](https://pakhoz.github.io/zero-hour-exchange/)**
+
+2026-11-10 验证：17 项核心测试、32 项浏览器检查通过；30 个种子均完成 14 天经营和两期租金。GitHub Actions 测试、构建、部署已[成功完成](https://github.com/Pakhoz/zero-hour-exchange/actions/runs/42811459562)。线上 12 个资源与本地正式产物逐字节一致，Chromium/WebKit 已验证实际 HTTPS 页面、收购与刷新恢复，Chromium 另验证线上断网刷新。iPad 真机安装与 Safari 系统交互尚未验证。
+
 ## 开始游玩
 
 1. 顾客出售时，你可以输入报价、接受对方报价，或拒绝。求购顾客则会购买你的库存。
