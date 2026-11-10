@@ -11,7 +11,8 @@ This repository is a standalone, static, single-player game. **It has no applica
 | Browser entry | `index.html`, `play.html` | Loads relative CSS and the ES module `src/app.js`. No credentials requested. |
 | UI controller | `src/app.js`, `initialize`, `dispatch` | Loads local progress, acquires a Web Lock for a single writer, dispatches actions and saves resulting state. |
 | Game engine | `src/core.js`, `act`, `settle` | Validates transactions against the current customer, funds and stock; closes completed encounters. These are game rules, not security authorization. |
-| Save persistence | `src/storage.js`, `load`, `save`; `src/core.js`, `validate` | Serializes validated versioned JSON in localStorage. Stores game state only. |
+| Save persistence | `src/storage.js`, `load`, `save`; `src/core.js`, `validate`, `migrate` | Reads V1/V2 saves, preserves a V1 backup before upgrading, then writes validated V2 JSON. Stores game state only. |
+| V2 stories and audio | `src/stories.js`, `src/audio.js` | Settles story choices locally; synthesizes optional audio without network requests. Audio preferences are stored separately. |
 | Service Worker | `sw.js` | Caches same-origin static assets for offline use. Does not perform login or attach authentication headers. |
 | Development server | `scripts/serve.mjs` | Serves static files on loopback, with path containment checks. It is not an API or a production auth service. |
 | CI deployment | `.github/workflows/pages.yml` | Uses GitHub-managed workflow permissions for Pages publication, outside the game's runtime. |
@@ -28,7 +29,7 @@ sequenceDiagram
     participant S as localStorage
     B->>H: GET index.html, CSS, ES modules, icons
     B->>SW: Register sw.js and cache core assets
-    UI->>S: Load and validate version 1 save
+    UI->>S: Load V1/V2 save; validate and migrate to V2
     B->>UI: Offer / accept / reject / sell / upgrade / end day
     UI->>G: act(state, action)
     G-->>UI: New state and result message
@@ -49,4 +50,4 @@ Gameplay actions make **no HTTP requests**. An `action.customerId` matches the c
 - GitHub Actions supplies its ephemeral workflow credential and Pages identity in the runner. The build job has `contents: read`; the deploy job has `pages: write` and `id-token: write`. GitHub's Pages deployment actions consume those capabilities. They are not bundled into `dist/` or persisted in localStorage.
 - Static hosting access controls, if configured by a host, are separate from this application. The game itself does not identify the player, synchronize devices, or protect saves from other users of the same browser profile.
 
-Future cloud saves would require a separate authenticated backend, server-side authorization for each player's records, and a migration plan. No account infrastructure is necessary for V1's local play.
+Future cloud saves would require a separate authenticated backend, server-side authorization for each player's records, and a migration plan. No account infrastructure is necessary for V2's local play.

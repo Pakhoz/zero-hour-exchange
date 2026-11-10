@@ -4,7 +4,7 @@ import {deflateSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
 import {resolve,dirname} from 'node:path';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const files=['index.html','styles.css','src/app.js','src/core.js','src/storage.js','src/art.js','manifest.webmanifest','assets/icon.svg'];
+const files=['index.html','styles.css','v2.css','src/app.js','src/core.js','src/storage.js','src/art.js','src/stories.js','src/audio.js','src/motion.js','manifest.webmanifest','assets/icon.svg'];
 // Original pixel emblem, written as PNG without graphics dependencies.
 function png(size){
  const data=Buffer.alloc(size*(size*4+1));

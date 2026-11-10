@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "seed": 602196497,
+  "nextId": 5,
+  "day": 1,
+  "cash": 951,
+  "inventory": [
+    {
+      "id": "z1",
+      "name": "末班地铁票",
+      "category": 2,
+      "base": 200,
+      "description": "2077 年停运线路的实体车票，编号仍可辨认。",
+      "icon": "ticket",
+      "quality": 64,
+      "authentic": false,
+      "cost": 49
+    }
+  ],
+  "upgrades": {
+    "storage": 0,
+    "scanner": 0,
+    "counter": 0
+  },
+  "rent": {
+    "amount": 650,
+    "due": 7,
+    "paid": 0
+  },
+  "served": 1,
+  "customer": {
+    "id": "z4",
+    "name": "雨燕",
+    "identity": "下城区信使",
+    "personality": 4,
+    "purpose": "sell",
+    "item": {
+      "id": "z3",
+      "name": "量子种子",
+      "category": 4,
+      "base": 480,
+      "description": "密封玻璃中，有一束不肯熄灭的微光。",
+      "icon": "orb",
+      "quality": 77,
+      "authentic": true,
+      "cost": 0
+    },
+    "limit": 259,
+    "quote": 307,
+    "patience": 1,
+    "maxPatience": 2,
+    "status": "active",
+    "rounds": 1,
+    "line": "这个价格不行。307 ₡，你再考虑一下。"
+  },
+  "market": {
+    "category": 1,
+    "headline": "机械零件行情回落",
+    "rates": [
+      1,
+      0.8,
+      1,
+      1,
+      1
+    ]
+  },
+  "stats": {
+    "trades": 1,
+    "profit": 0
+  },
+  "ledger": {
+    "opening": 1000,
+    "earned": 0,
+    "spent": 49,
+    "profit": 0
+  },
+  "history": [],
+  "gameOver": false,
+  "message": "顾客还价 307 ₡ · 耐心 1/2"
+}

@@ -1,4 +1,5 @@
-export const VERSION = 1;
+import {STORIES,scheduleStory,chooseStory,expireStory} from './stories.js';
+export const VERSION = 2;
 export const CATEGORIES = ['电子设备', '机械零件', '旧世收藏', '艺术品', '未知科技'];
 export const CATALOG = [
   ['回声随身听', 0, 260, '旧时代的磁带里，还留着一场没结束的雨。', 'radio'],
@@ -34,7 +35,14 @@ export const upgradeCost = (s, key) => UPGRADES[key].base * (s.upgrades[key] + 1
 export function valueOf(s, item, revealed=false) {
   return Math.max(1, Math.round(item.base * (0.7 + item.quality / 100 * 0.6) * s.market.rates[item.category] * (revealed && !item.authentic ? 0.4 : 1)));
 }
-export const quickPrice = (s, item) => Math.floor(valueOf(s,item,true) * 0.78);
+export const quickRate = s => 0.78 + (s.story?.effects.resale||0);
+export const quickPrice = (s, item) => Math.floor(valueOf(s,item,true) * quickRate(s));
+export function discover(s, goods, owned=false, verified=false) {
+  const key=CATALOG.findIndex(x=>x[0]===goods.name);if(key<0)return;
+  let entry=s.collection.find(x=>x.key===key);
+  if(!entry){entry={key,firstDay:s.day,owned:false,verified:false,bestQuality:goods.quality};s.collection.push(entry);}
+  entry.owned ||= owned;entry.verified ||= verified;entry.bestQuality=Math.max(entry.bestQuality,goods.quality);
+}
 function market(s) {
   const category = Math.floor(random(s) * 5), up = random(s) > 0.32;
   s.market = {category, headline:`${CATEGORIES[category]}${up ? '需求升温' : '行情回落'}`, rates:CATEGORIES.map((_,i)=>i===category ? (up ? 1.25 : 0.80) : 1)};
@@ -50,18 +58,21 @@ function visitor(s) {
   const goods = purpose==='buy' ? pick(s,s.inventory) : item(s,personality===4);
   const reference = valueOf(s,goods,true);
   const limit = Math.round(reference * (purpose==='sell' ? p.sell : p.buy) * (0.95+random(s)*0.10));
-  s.customer = {id:uid(s), name:pick(s,['雨燕','阿岚','陆七','莫莉','灰狐','祁川','洛零','白噪']), identity:pick(s,['下城区信使','义体维修师','夜班调音师','轨道拾荒者','旧物档案员']), personality, purpose, item:structuredClone(goods), limit, quote:Math.round(limit*(purpose==='sell'?1.30:0.78)), patience:p.patience+s.upgrades.counter, maxPatience:p.patience+s.upgrades.counter, status:'active', rounds:0, line:p.line};
+  const patience=p.patience+s.upgrades.counter+(s.story?.effects.patience||0);
+  s.customer = {id:uid(s), name:pick(s,['雨燕','阿岚','陆七','莫莉','灰狐','祁川','洛零','白噪']), identity:pick(s,['下城区信使','义体维修师','夜班调音师','轨道拾荒者','旧物档案员']), personality, purpose, item:structuredClone(goods), limit, quote:Math.round(limit*(purpose==='sell'?1.30:0.78)), patience, maxPatience:patience, status:'active', rounds:0, line:p.line,interactions:{talked:false,tea:false,inspected:false}};
+  discover(s,goods,false,!!s.upgrades.scanner);
 }
 export function newGame(seed = Date.now() >>> 0) {
   const s = {version:VERSION, seed:seed>>>0, nextId:1, day:1, cash:1000, inventory:[], upgrades:{storage:0,scanner:0,counter:0}, rent:{amount:650,due:7,paid:0}, served:0, customer:null, market:null, stats:{trades:0,profit:0}, ledger:{opening:1000,earned:0,spent:0,profit:0}, history:[], gameOver:false, message:'霓虹灯已亮起。欢迎来到零点交易所。'};
-  market(s); visitor(s); return s;
+  s.collection=[];s.story={current:null,flags:[],reputation:0,effects:{patience:0,resale:0},log:[]};
+  scheduleStory(s);market(s); visitor(s); return s;
 }
 function settle(s, price) {
   const c=s.customer;
   if(c.purpose==='sell') {
     if(s.inventory.length>=capacity(s)) return '货架已满，请先出售库存。';
     if(price>s.cash) return '现金不足，无法完成收购。';
-    s.cash-=price; s.ledger.spent+=price; s.inventory.push({...c.item,cost:price});
+    s.cash-=price; s.ledger.spent+=price; s.inventory.push({...c.item,cost:price});discover(s,c.item,true,!!s.upgrades.scanner);
   } else {
     const index=s.inventory.findIndex(i=>i.id===c.item.id);
     if(index<0) return '这件商品已不在库存中。';
@@ -76,6 +87,25 @@ export function act(original, action) {
   const s=structuredClone(original), c=s.customer;
   const say = message => {s.message=message; return s;};
   if(s.gameOver) return say('店铺已停业。你可以查看存档或重新开始。');
+  if(action.type==='storyChoice')return say(chooseStory(s,action.eventId,action.choiceId));
+  if(['talk','tea','inspect'].includes(action.type)) {
+    if(!c || c.status!=='active' || action.customerId!==c.id)return say('这位顾客已经离开。');
+    const key={talk:'talked',tea:'tea',inspect:'inspected'}[action.type];
+    if(c.interactions[key])return say('这次互动已经完成。');
+    if(action.type==='tea'){
+      if(s.cash<10)return say('热饮需要 10 ₡，现金不足。');
+      s.cash-=10;s.ledger.spent+=10;c.maxPatience=Math.min(10,c.maxPatience+2);c.patience=Math.min(c.maxPatience,c.patience+2);
+      c.line='这杯热的来得正好。别急，我们慢慢谈。';
+    }else if(action.type==='talk'){
+      const lines=['在这条街住久了，旧东西就舍不得扔。你愿意听，价格可以再商量。','我是做生意的，但也看重回头客。既然聊得来，我可以留一点空间。','今天的末班车不等人。谢谢你愿意听我说，我再让一点。','我记得它第一次出现的样子。能找到懂它的人，价钱不是唯一的事。','来路我不能细说。不过你挺有耐心，我可以再松一点口。'];
+      c.line=lines[c.personality];c.limit=Math.max(1,Math.round(c.limit*(c.purpose==='sell'?0.97:1.03)));
+      c.maxPatience=Math.min(10,c.maxPatience+1);c.patience=Math.min(c.maxPatience,c.patience+1);
+    }else{
+      discover(s,c.item,false,!!s.upgrades.scanner);
+      c.line=s.upgrades.scanner?`扫描结果：${c.item.authentic?'正品':'仿制品'}。你看得很仔细。`:`${c.item.quality>=75?'外壳保存得不错，接缝也很整齐。':'表面有使用痕迹，磨损集中在边角。'}仅凭外观无法确认真伪。`;
+    }
+    c.interactions[key]=true;return say(action.type==='tea'?'热饮 −10 ₡ · 耐心 +2':action.type==='talk'?'聊过来历 · 耐心 +1 · 心理价松动 3%':'观察记录已加入图鉴。');
+  }
   if(['offer','accept','reject'].includes(action.type)) {
     if(!c || c.status!=='active' || action.customerId!==c.id) return say('这次交易已经结束。');
     if(action.type==='reject') { c.status='left'; c.line='那就到这里吧。'; s.served++; return say('交易已取消，没有扣款。'); }
@@ -110,7 +140,9 @@ export function act(original, action) {
     const u=UPGRADES[action.key]; if(!u) return say('未知升级。');
     if(s.upgrades[action.key]>=u.max) return say('这项设备已满级。');
     const cost=upgradeCost(s,action.key); if(s.cash<cost) return say('升级资金不足。');
-    s.cash-=cost;s.ledger.spent+=cost;s.upgrades[action.key]++;return say(`${u.name}升级完成 · 花费 ${cost} ₡。`);
+    s.cash-=cost;s.ledger.spent+=cost;s.upgrades[action.key]++;
+    if(action.key==='scanner'){for(const goods of s.inventory)discover(s,goods,true,true);if(c)discover(s,c.item,false,true);}
+    return say(`${u.name}升级完成 · 花费 ${cost} ₡。`);
   }
   if(action.type==='endDay') {
     if(action.day!==s.day) return say('今天已经结算。');
@@ -120,14 +152,14 @@ export function act(original, action) {
       rent=s.rent.amount;s.cash-=rent;s.ledger.spent+=rent;s.rent.paid++;s.rent.due+=7;s.rent.amount=Math.round(s.rent.amount*1.08);
     }
     s.history.unshift({day:s.day,...s.ledger,closing:s.cash,rent});s.history=s.history.slice(0,30);
-    s.day++;s.served=0;s.ledger={opening:s.cash,earned:0,spent:0,profit:0};market(s);visitor(s);
+    expireStory(s);s.day++;s.served=0;s.ledger={opening:s.cash,earned:0,spent:0,profit:0};scheduleStory(s);market(s);visitor(s);
     return say(`第 ${s.day} 天开始营业。${rent?`已支付租金 ${rent} ₡。`:''}`);
   }
   return say('未知操作。');
 }
 function validItem(i) {return i && typeof i.id==='string' && /^z\d+$/.test(i.id) && typeof i.name==='string' && i.name.length<100 && integer(i.category,0,4) && integer(i.base,1,1000000) && integer(i.cost) && integer(i.quality,0,100) && typeof i.authentic==='boolean' && CATALOG.some(x=>x[4]===i.icon) && typeof i.description==='string' && i.description.length<1000;}
-export function validate(s) {
-  if(!s || s.version!==VERSION || !integer(s.seed,0,4294967295) || !integer(s.nextId,1) || !integer(s.day,1,100000) || !integer(s.cash) || typeof s.gameOver!=='boolean') return false;
+function validateBase(s) {
+  if(!s || ![1,VERSION].includes(s.version) || !integer(s.seed,0,4294967295) || !integer(s.nextId,1) || !integer(s.day,1,100000) || !integer(s.cash) || typeof s.gameOver!=='boolean') return false;
   if(!s.upgrades || !Object.keys(UPGRADES).every(k=>integer(s.upgrades[k],0,UPGRADES[k].max))) return false;
   if(!Array.isArray(s.inventory) || s.inventory.length>capacity(s) || !s.inventory.every(validItem) || new Set(s.inventory.map(i=>i.id)).size!==s.inventory.length) return false;
   if(!s.rent || !integer(s.rent.amount,1) || !integer(s.rent.due,s.day,s.day+6) || s.rent.due%7!==0 || !integer(s.rent.paid) || s.rent.paid!==s.rent.due/7-1) return false;
@@ -139,4 +171,30 @@ export function validate(s) {
   if(c?.status==='active' && c.purpose==='buy' && !s.inventory.some(i=>i.id===c.item.id)) return false;
   if([...s.inventory.map(i=>i.id),...(c?[c.id,c.item.id]:[])].some(id=>Number(id.slice(1))>=s.nextId)) return false;
   return typeof s.message==='string';
+}
+export function validate(s){
+  if(!validateBase(s)||s.version!==VERSION)return false;
+  if(!Array.isArray(s.collection)||s.collection.length>CATALOG.length||new Set(s.collection.map(x=>x?.key)).size!==s.collection.length||!s.collection.every(x=>x&&integer(x.key,0,CATALOG.length-1)&&integer(x.firstDay,1,s.day)&&integer(x.bestQuality,0,100)&&typeof x.owned==='boolean'&&typeof x.verified==='boolean'))return false;
+  const st=s.story;
+  if(!st||!integer(st.reputation,0,100)||!Array.isArray(st.flags)||st.flags.length>1||!st.flags.every(f=>f==='helped-courier')||!st.effects||![0,1].includes(st.effects.patience)||![0,0.10].includes(st.effects.resale))return false;
+  const validEvent=(e,log=false)=>{
+    if(!e||!Object.hasOwn(STORIES,e.key)||!integer(e.day,1,s.day)||e.id!==`story-${e.day}-${e.key}`||!['pending','resolved','missed'].includes(e.status)||typeof e.result!=='string'||e.result.length>1000)return false;
+    if(e.status==='resolved'&&!STORIES[e.key].choices.some(c=>c.id===e.choice))return false;
+    if(e.status!=='resolved'&&e.choice!==null)return false;
+    return !log||(e.status!=='pending'&&integer(e.cost)&&integer(e.reward));
+  };
+  if(st.current!==null&&(!validEvent(st.current)||st.current.day!==s.day))return false;
+  if(!Array.isArray(st.log)||st.log.length>50||!st.log.every(e=>validEvent(e,true))||new Set(st.log.map(e=>e.id)).size!==st.log.length)return false;
+  if(s.customer&&(!s.customer.interactions||!['talked','tea','inspected'].every(k=>typeof s.customer.interactions[k]==='boolean')))return false;
+  return true;
+}
+// A validated V1 snapshot is upgraded without advancing RNG, money, day or negotiation.
+export function migrate(raw){
+  if(raw?.version===VERSION){if(!validate(raw))throw new Error('存档数据不兼容。');return structuredClone(raw);}
+  if(raw?.version!==1||!validateBase(raw))throw new Error('存档版本或数据不兼容。');
+  const s=structuredClone(raw);s.version=VERSION;s.collection=[];
+  s.story={current:null,flags:[],reputation:0,effects:{patience:0,resale:0},log:[]};scheduleStory(s);
+  for(const goods of s.inventory)discover(s,goods,true,!!s.upgrades.scanner);
+  if(s.customer){s.customer.interactions={talked:false,tea:false,inspected:false};discover(s,s.customer.item,s.customer.purpose==='buy'||s.customer.status==='done',!!s.upgrades.scanner);}
+  if(!validate(s))throw new Error('存档升级失败。');return s;
 }

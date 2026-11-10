@@ -1,6 +1,6 @@
 // Build replaces this marker with a content hash. Old games finish before updates activate.
 const CACHE = 'zero-hour-__BUILD_HASH__';
-const CORE = ['./','./index.html','./play.html','./styles.css','./src/app.js','./src/core.js','./src/storage.js','./src/art.js','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png'];
+const CORE = ['./','./index.html','./play.html','./styles.css','./v2.css','./src/app.js','./src/core.js','./src/storage.js','./src/art.js','./src/stories.js','./src/audio.js','./src/motion.js','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png'];
 const ROOT = new URL('./', self.location.href);
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE))));
 self.addEventListener('activate', event => event.waitUntil((async()=>{
